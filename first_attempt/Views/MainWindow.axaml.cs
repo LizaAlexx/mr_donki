@@ -110,5 +110,57 @@ namespace first_attempt.Views
             Console.WriteLine($"✅ Синхронизация завершена. Добавлено новых записей: {newRecords}");
         }
 
+        private async void OnShowStats_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Очистить список перед выводом новой статистики
+                ComparisonResultListBox.ItemsSource = null;
+
+                PostgresService postgresService = new PostgresService();
+
+                // Получаем общее число событий
+                var allEvents = await postgresService.GetAllCMEEventsAsync();
+                int totalEvents = allEvents.Count;
+                int eventsWithAnalysis = allEvents.Count(e => e.cmeAnalyses != null && e.cmeAnalyses.Count > 0);
+                int eventsWithoutAnalysis = totalEvents - eventsWithAnalysis;
+
+                double avgSpeed = allEvents
+                    .Where(e => e.cmeAnalyses != null)
+                    .SelectMany(e => e.cmeAnalyses)
+                    .Where(a => a.speed.HasValue)
+                    .Select(a => a.speed.Value)
+                    .DefaultIfEmpty(0)
+                    .Average();
+
+                // Получаем количество событий по годам
+                var eventsByYear = await postgresService.GetEventCountsByYearAsync();
+
+                var stats = new List<string>
+        {
+            $"Общее число CME событий: {totalEvents}",
+            $"Из них с анализами: {eventsWithAnalysis}",
+            $"Из них без анализов: {eventsWithoutAnalysis}",
+            $"Средняя скорость CME (по анализам): {avgSpeed:F2} км/с",
+            "",
+            "Статистика по годам:"
+        };
+
+                foreach (var year in eventsByYear.OrderBy(e => e.Key))
+                {
+                    stats.Add($"Год {year.Key}: {year.Value} событий");
+                }
+
+                ComparisonResultListBox.ItemsSource = stats;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка при выводе статистики: {ex.Message}");
+            }
+        }
+
+
+
+
     }
 }

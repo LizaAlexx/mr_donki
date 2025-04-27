@@ -273,5 +273,67 @@ namespace first_attempt.Services
             return ids;
         }
 
+        public async Task<Dictionary<int, int>> GetEventCountsByYearAsync()
+        {
+            var result = new Dictionary<int, int>();
+
+            await using var conn = new NpgsqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            var query = "SELECT start_time FROM cme_event";
+            await using var cmd = new NpgsqlCommand(query, conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
+            {
+                var startTimeStr = reader.GetString(0);
+
+                if (DateTime.TryParse(startTimeStr, out var startTime))
+                {
+                    var year = startTime.Year;
+                    if (result.ContainsKey(year))
+                        result[year]++;
+                    else
+                        result[year] = 1;
+                }
+            }
+
+            return result;
+        }
+
+        public async Task<List<CMEEvent>> GetAllCMEEventsAsync()
+        {
+            var events = new List<CMEEvent>();
+
+            await using var conn = new NpgsqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            var query = @"SELECT activity_id, catalog, start_time, source_location, active_region_num, note, submission_time, version_id, link FROM cme_event;";
+            await using var cmd = new NpgsqlCommand(query, conn);
+            await using var reader = await cmd.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
+            {
+                var ev = new CMEEvent
+                {
+                    activityID = reader.IsDBNull(0) ? null : reader.GetString(0),
+                    catalog = reader.IsDBNull(1) ? null : reader.GetString(1),
+                    startTime = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    sourceLocation = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    activeRegionNum = reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                    note = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    submissionTime = reader.IsDBNull(6) ? null : reader.GetString(6),
+                    versionId = reader.IsDBNull(7) ? 0 : reader.GetInt32(7),
+                    link = reader.IsDBNull(8) ? null : reader.GetString(8)
+                };
+                events.Add(ev);
+            }
+
+            return events;
+        }
+
+
+
+
     }
 }
